@@ -1,15 +1,20 @@
 using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
 
 public class PlayerController : MonoBehaviour
 {
-    public float gravityModifier;
+    public bool hasPowerup = false;
+    public bool isGameOver = false;
+    public int powerupDuration = 10;
+    public float rotationSpeed = 180f; // Degrees per second
+
     private Rigidbody playerRb;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         playerRb = GetComponent<Rigidbody>(); // Get the Rigidbody component attached to the player
-        Physics.gravity *= gravityModifier; // Modify the global gravity by the gravityModifier
     }
 
     // Update is called once per frame
@@ -18,6 +23,15 @@ public class PlayerController : MonoBehaviour
         // call methods that handle player movement and check for out-of-bounds
         MovePlayer();
         OutOfBounds();
+
+        // Always rotate forward
+        transform.Rotate(Vector3.forward, rotationSpeed * Time.deltaTime);
+    }
+
+    IEnumerator PowerupCountdownRoutine()
+    {
+        yield return new WaitForSeconds(powerupDuration); // Wait for 7 seconds
+        hasPowerup = false; // Set hasPowerup to false after the countdown
     }
 
     private void MovePlayer()
@@ -26,28 +40,55 @@ public class PlayerController : MonoBehaviour
         float speed = 10.0f;
         float jumpForce = 10.0f;
 
-
-        float horizontalInput = Input.GetAxis("Horizontal"); // Get horizontal input (A/D or Left/Right arrow keys)
+        float verticalInput = Input.GetAxis("Vertical"); // Get vertical input (W/S or Up/Down arrow keys)
         Vector3 velocity = playerRb.linearVelocity; // Get current velocity
-        velocity.x = horizontalInput * speed; // Set horizontal velocity based on input and speed
+        velocity.z = verticalInput * speed; // Set z-axis velocity based on input and speed
         playerRb.linearVelocity = velocity; // Apply the modified velocity back to the Rigidbody
-
-        // Jump when spacebar is pressed
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            playerRb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-        }
     }
 
     private void OutOfBounds()
     {
         // Reset player position to the center if out of bounds
-        Vector3 Center = new Vector3(0, 0.5f, -0.5f);
-        float outOfBoundsX = 25.0f;
+        float outOfBoundsZ = 5.0f;
 
-        if (transform.position.x < -outOfBoundsX || transform.position.x > outOfBoundsX)
+        if (transform.position.z < -outOfBoundsZ)
         {
-            transform.position = Center;
+            Vector3 pos = transform.position;
+            pos.z = -(outOfBoundsZ) + 0.5f;
+            transform.position = pos;
+        }
+        else if (transform.position.z > outOfBoundsZ)
+        {
+            Vector3 pos = transform.position;
+            pos.z = outOfBoundsZ - 0.5f;
+            transform.position = pos;
+        }
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("Enemy"))
+        {
+            if (hasPowerup)
+            {
+                Destroy(collision.gameObject); // Destroy the enemy object
+                Debug.Log("Enemy destroyed with powerup!");
+                return; // Exit the method to avoid destroying the player
+            }
+            else
+            {
+                Destroy(gameObject); // Destroy the player object
+                Debug.Log("Game Over!");
+                isGameOver = true; // Set isGameOver to true
+            }
+        }
+
+        if (collision.gameObject.CompareTag("Powerup"))
+        {
+            Destroy(collision.gameObject); // Destroy the powerup object
+            hasPowerup = true; // Set hasPowerup to true
+            Debug.Log("Powerup collected!");
+            StartCoroutine(PowerupCountdownRoutine()); // Start the powerup countdown
         }
     }
 }
